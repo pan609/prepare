@@ -147,17 +147,86 @@ List作为Collection接口的子接口，可以使用Collection接口里的全�
 ```
 // 默认构造函数。
 HashMap()
-
 // 指定“容量大小”的构造函数
 HashMap(int capacity)
-
 // 指定“容量大小”和“加载因子”的构造函数
 HashMap(int capacity, float loadFactor)
-
 // 包含“子Map”的构造函数
 HashMap(Map<? extends K, ? extends V> map)
 ```
     - 默认加载因子是 0.75
+- [HashMap线程安全](https://www.cnblogs.com/jmcui/p/11422083.html)
+    - hashmap 是线程不安全的,JDK1.7是数组+链表，多线程背景下，在数组扩容的时候，存在 Entry 链死循环和数据丢失问题。JDK1.8是数组+链表+红黑树,优化了 1.7 中数组扩容的方案，解决了 Entry 链死循环和数据丢失问题。但是多线程背景下，put 方法存在数据覆盖的问题。
+    - hashtable使用 synchronize 保证线程安全,但在线程竞争激烈的情况下，效率低下,因为当一个线程访问 HashTable 的同步方法，其他线程也访问 HashTable 的同步方法时，会进入阻塞或轮询状态。如线程1使用 put 进行元素添加，线程2不但不能使用 put 方法添加元素，也不能使用 get 方法来获取元素，所以竞争越激烈效率越低。
+    - ConcurrentHashMap线程安全，JDK 1.7 ConcurrentHashMap 采用Segment数组 + HashEntry数组实现。 Segment 是一种可重入锁（ReentrantLock），在 ConcurrentHashMap 里扮演锁的角色；HashEntry 则用于存储键值对数据。一个 ConcurrentHashMap 里包含一个 Segment 数组，一个 Segment 里包含一个 HashEntry 数组，每个 HashEntry 是一个链表结构的元素。JDK 1.8 ConcurrentHashMap 采用数组 + 链表 + 红黑树的方式实现，结构基本上和 1.8 中的 HashMap 一样，不过大量的利用了 volatile，final，CAS 等 lock-free 技术来减少锁竞争对于性能的影响，从而保证线程安全性。
+
 
 - TreeMap
     - 红黑树
+
+#### 设计模式
+##### 具体设计模式
+- 单例模式
+    ```java
+        // DCL
+        public class Singleton {  
+            private volatile static Singleton singleton;  
+            private Singleton (){}  
+            public static Singleton getSingleton() {  
+            if (singleton == null) {  
+                synchronized (Singleton.class) {  
+                if (singleton == null) {  
+                    singleton = new Singleton();  
+                }  
+                }  
+            }  
+            return singleton;  
+            }  
+        }
+    ```
+    - volatile 作用：在 new Singleton()时禁止指令重排序
+    - 两次 synchronized 作用：![](https://img-blog.csdnimg.cn/20190328172048440.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQxNzI3MjE4,size_16,color_FFFFFF,t_70)第一个 if 解决一个雷只能实例化一个对象，如果两个线程同时通过了第一个 if 判断，第一个if判断避免了其他无用线程竞争锁来造成性能浪费，第二个if判断能拦截除第一个获得对象锁线程以外的线程,如果不加第二次判空，我们考虑下线程A，线程B都阻塞在了获取锁的步骤上，其中A获得锁---实例化了对象----释放锁，之后B---获得锁---实例化对象
+    ```JAVA
+    // lazy
+    public class Singleton {  
+        private static Singleton instance;  
+        private Singleton (){}  
+        public static synchronized Singleton getInstance() {  
+        if (instance == null) {  
+            instance = new Singleton();  
+        }  
+        return instance;  
+        }  
+    }
+    ```
+    - volatile 不能保证原子性，可以保证可见性有序性,保证有序性是禁止指令重排序
+- builder模式(非线程安全)
+    - 应用：AlertDialog
+    - 优点：客户端代码的可用性和可读性得到了大大提高。与此同时，构造函数的参数数量明显减少调用起来非常直观
+- [观察者模式](https://www.jianshu.com/p/8f32da74cd8b)
+    - 应用：对控件的监听 listener
+- 工厂
+##### [六大设计原则](http://www.uml.org.cn/sjms/201211023.asp#2)
+- 单一职责原则
+- 开闭原则
+- 里氏替换原则
+- 依赖倒置原则
+- 接口隔离原则
+- 迪米特法则 
+##### [代理模式](https://juejin.cn/post/6925692200802058254#heading-4)
+- 代理模式:简单的来讲其实我们的目的就是为一个业务类提供一个代理对象来完成业务逻辑
+- 构成
+    - 共同的行为（常用作接口或抽象类）
+    - 委托对象（真实对象，向代理对象提供委托）
+    - 代理对象（代理对象，负责实现真实对象的委托）
+- 遵循原则
+    - 委托类与代理类又共同行为或相似的行为
+    - 代理类负责针对委托类进行增强和管理
+- 静态代理
+    - 是指程序的设计者在程序运行前就已经为委托对象创建好了代理对象，换句话说就是我们在启动服务之前，代理对象的.class文件就已经生成了。
+- 动态代理（Dynamic Proxy）
+    - 动态代理是java提供的一种运行时加载代理技术，相比于静态代理，动态代理在为对象提供代理服务的时候更加灵活，动态代理类可以在程序运行时由java通过反射动态的生成。简单的来说动态代理是在实现阶段不用关系我去代理谁，而在运行阶段才会去指定委托对象。常见的动态代理有两种实现形式：接口代理 和 cglib代理。
+    - 接口代理（jdk 代理）
+        - 接口代理方式是java自带的一种动态代理模式,其通过Proxy类的静态方法newProxyInstance返回一个接口的代理实例已达到针对不同的委托类都能生成对应的代理类的目的。
+    - Cglib代理
+        - Cglib代理模式采用了非常底层的字节码技术来实现动态代理。其不要求委托类实现某一个接口，而是通过字节码技术为委托类创建一个子类，并通过拦截父类的方法调用的形式来动态的将代理逻辑织入到方法中，但是由于采用的是创建子类集成的形式，父类不可以用final来进行类修饰。这里需要注意的是cglib并不是java自带的API，因此我们想要使用前需要导入相关的依赖JAR包
